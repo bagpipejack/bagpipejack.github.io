@@ -3,12 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Real-Time Board List with Auto-Cleanup</title>
+  <title>P2P Real-Time Image Board</title>
+  
+  <!-- PeerJS library for WebRTC data connections -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
   <style>
     * { box-sizing: border-box; font-family: system-ui, sans-serif; }
-    body { margin: 0; display: flex; height: 100vh; background: #f8f9fa; }
-
-    /* Sidebar for Room Discovery */
+    body { margin: 0; padding: 0; display: flex; height: 100vh; background-color: #f8f9fa; overflow: hidden; }
+    
+    /* Global Board List Sidebar */
     #sidebar {
       width: 280px;
       background: #ffffff;
@@ -17,28 +21,19 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
-    }
-
-    /* Main Board Display */
-    #main-content {
-      flex: 1;
-      padding: 40px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      z-index: 1000;
     }
 
     button {
-      background: #0d6efd;
+      background-color: #0d6efd;
       color: white;
       border: none;
-      padding: 10px 16px;
+      padding: 10px 14px;
       border-radius: 6px;
-      font-weight: 600;
       cursor: pointer;
+      font-weight: 600;
     }
-    button:hover { background: #0b5ed7; }
+    button:hover { background-color: #0b5ed7; }
 
     ul { list-style: none; padding: 0; margin: 0; }
     li {
@@ -52,25 +47,68 @@
     }
     li a { color: #0d6efd; text-decoration: none; font-weight: 500; }
     li a:hover { text-decoration: underline; }
-    .badge { background: #28a745; color: white; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+    .badge { background: #198754; color: white; font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+
+    /* Main Board Canvas */
+    #board-container {
+      flex: 1;
+      position: relative;
+      height: 100vh;
+      background: #f4f4f9;
+    }
+
+    #status-bar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 900;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 8px 14px;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .draggable-img {
+      position: absolute;
+      width: 200px;
+      cursor: grab;
+      user-select: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      border-radius: 8px;
+      touch-action: none;
+    }
+    .draggable-img:active { cursor: grabbing; }
   </style>
 </head>
 <body>
 
+  <!-- Left Sidebar: Global Room List via Firebase -->
   <div id="sidebar">
-    <h2>Active Boards</h2>
-    <button id="create-board-btn">Host New Board</button>
+    <h2>Live Boards</h2>
+    <button id="host-btn" onclick="createNewBoard()">Host Your Own Board</button>
     <ul id="board-list">
-      <li style="color: #6c757d;">Loading active boards...</li>
+      <li style="color: #6c757d;">Loading live boards...</li>
     </ul>
   </div>
 
-  <div id="main-content">
-    <h1 id="current-status">Viewer Mode</h1>
-    <p id="board-info">Select an active board from the sidebar or host your own.</p>
+  <!-- Right Canvas: Draggable Image Board via WebRTC -->
+  <div id="board-container">
+    <div id="status-bar">
+      <span id="role-status">Connecting to WebRTC...</span>
+    </div>
+
+    <img 
+      id="shared-image" 
+      class="draggable-img" 
+      src="https://picsum.photos/300/200" 
+      alt="Shared Canvas Image" 
+      style="left: 100px; top: 100px;"
+    />
   </div>
 
-  <!-- Import Firebase JS SDKs as ES Modules -->
+  <!-- Firebase Modular SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { 
@@ -82,30 +120,38 @@
       serverTimestamp 
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-    // 1. YOUR FIREBASE CONFIGURATION
-    // Replace with your project details from the Firebase Console
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDwIlb8npbaCEcx2yjZEBgMAc9sdufhiq4",
+  authDomain: "js-app-988a7.firebaseapp.com",
+  databaseURL: "https://js-app-988a7-default-rtdb.firebaseio.com",
+  projectId: "js-app-988a7",
+  storageBucket: "js-app-988a7.firebasestorage.app",
+  messagingSenderId: "902598022429",
+  appId: "1:902598022429:web:2291ddaf2ff06c3803bdf4"
+};
 
-    // Initialize Firebase
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+
+    
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
     const boardListEl = document.getElementById('board-list');
-    const createBtn = document.getElementById('create-board-btn');
-    const currentStatus = document.getElementById('current-status');
-    const boardInfo = document.getElementById('board-info');
+    const roleStatus = document.getElementById('role-status');
+    const img = document.getElementById('shared-image');
 
-    // 2. LISTEN FOR ACTIVE BOARDS IN REAL-TIME
+    let peer = null;
+    let connections = []; // Active WebRTC connections (if hosting)
+    let hostConn = null;   // Connection to host (if viewing)
+    let isHost = false;
+
+    // --- 2. FIREBASE REAL-TIME LOBBY (GLOBAL ROOM LIST) ---
     const activeBoardsRef = ref(db, 'active_boards');
 
+    // Listen for live room changes across the entire network
     onValue(activeBoardsRef, (snapshot) => {
       boardListEl.innerHTML = '';
       const boards = snapshot.val();
@@ -115,11 +161,9 @@
         return;
       }
 
-      // Render each active board ID to the sidebar list
       Object.keys(boards).forEach((boardId) => {
         const boardData = boards[boardId];
         const li = document.createElement('li');
-        
         const isCurrentBoard = window.location.hash === `#${boardId}`;
         
         li.innerHTML = `
@@ -130,40 +174,117 @@
       });
     });
 
-    // 3. HOST A BOARD WITH AUTOMATIC DISCONNECTION CLEANUP
-    async function registerHostBoard() {
-      // Generate a unique board ID
+    // --- 3. WEBRTC & ROOM SETUP ---
+    const roomHash = window.location.hash.substring(1);
+
+    if (roomHash) {
+      // Viewer Mode: Connect to host peer using hash
+      isHost = false;
+      roleStatus.innerText = "Connecting to Host (" + roomHash + ")...";
+      peer = new Peer();
+
+      peer.on('open', () => {
+        hostConn = peer.connect(roomHash);
+        setupConnection(hostConn);
+      });
+    } else {
+      // Host Mode: Register room with PeerJS & Firebase
+      startHosting();
+    }
+
+    async function startHosting() {
+      isHost = true;
       const boardId = 'board-' + Math.random().toString(36).substr(2, 6);
       window.location.hash = boardId;
+      
+      roleStatus.innerText = "Hosting Board (" + boardId + ")";
 
+      // Register with Firebase Realtime Database
       const myBoardRef = ref(db, `active_boards/${boardId}`);
-
-      // A. Instruct Firebase server to DELETE this board reference if the socket drops
+      
+      // Auto-delete from global list if browser tab closes or loses connection
       await onDisconnect(myBoardRef).remove();
-
-      // B. Write the board entry to the active_boards collection
       await set(myBoardRef, {
         name: `Board #${boardId.split('-')[1]}`,
         createdAt: serverTimestamp()
       });
 
-      // Update UI
-      currentStatus.innerText = "Hosting Board: " + boardId;
-      boardInfo.innerText = "Your board is live in the sidebar for all viewers! If you close this tab, it will auto-delete instantly.";
+      // Initialize PeerJS host
+      peer = new Peer(boardId);
+      peer.on('connection', (conn) => {
+        connections.push(conn);
+        conn.on('open', () => {
+          // Immediately sync current image position to the new viewer
+          conn.send({ x: parseInt(img.style.left), y: parseInt(img.style.top) });
+        });
+      });
     }
 
-    // 4. ROUTING & BUTTON LISTENERS
-    createBtn.addEventListener('click', () => {
-      registerHostBoard();
+    // Global function for "Host Your Own Board" button
+    window.createNewBoard = function() {
+      window.location.href = window.location.pathname;
+    };
+
+    // Reload page if hash changes (allows clicking rooms in sidebar)
+    window.addEventListener('hashchange', () => {
+      window.location.reload();
     });
 
-    // Listen for Hash changes when a user clicks a room link in the sidebar
-    window.addEventListener('hashchange', () => {
-      const currentHash = window.location.hash.substring(1);
-      if (currentHash) {
-        currentStatus.innerText = "Viewing Board: " + currentHash;
-        boardInfo.innerText = "Connected to live stream for " + currentHash;
+    // --- 4. WEBRTC DATA HANDLING ---
+    function setupConnection(conn) {
+      conn.on('open', () => {
+        roleStatus.innerText = "Viewer Mode (Connected)";
+      });
+
+      conn.on('data', (data) => {
+        if (data.x !== undefined && data.y !== undefined) {
+          img.style.left = data.x + 'px';
+          img.style.top = data.y + 'px';
+        }
+      });
+
+      conn.on('close', () => {
+        roleStatus.innerText = "Host disconnected.";
+      });
+    }
+
+    function broadcastPosition(x, y) {
+      if (isHost) {
+        connections.forEach(conn => {
+          if (conn.open) conn.send({ x, y });
+        });
+      } else if (hostConn && hostConn.open) {
+        hostConn.send({ x, y });
       }
+    }
+
+    // --- 5. DRAG & DROP LOGIC ---
+    let isDragging = false;
+    let offsetX = 0, offsetY = 0;
+
+    img.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      offsetX = e.clientX - img.offsetLeft;
+      offsetY = e.clientY - img.offsetTop;
+      img.setPointerCapture(e.pointerId);
+    });
+
+    img.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+
+      const x = e.clientX - offsetX;
+      const y = e.clientY - offsetY;
+
+      img.style.left = x + 'px';
+      img.style.top = y + 'px';
+
+      // Stream new coordinates over WebRTC
+      broadcastPosition(x, y);
+    });
+
+    img.addEventListener('pointerup', (e) => {
+      isDragging = false;
+      img.releasePointerCapture(e.pointerId);
     });
   </script>
 </body>
