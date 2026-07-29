@@ -1,42 +1,19 @@
-<!DOCTYPE html>
+
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>WebRTC DataChannel Hello World</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        textarea { width: 100%; height: 60px; margin: 10px 0; }
-        button { padding: 10px 20px; font-weight: bold; cursor: pointer; }
-        .box { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
-    </style>
-</head>
+
 <body>
 
-    <h1>WebRTC "Hello World" (Single Tab P2P)</h1>
-    
-    <div class="box">
-        <h3>Step 1: Initialization</h3>
-        <button id="startButton">1. Create Local Peer</button>
-    </div>
+    <button id="startButton">1. Create Local Peer</button>
 
-    <div class="box">
-        <h3>Step 2: The Handshake (Signaling Simulation)</h3>
-        <label>Copy Local Offer/Answer SDP from here:</label>
-        <textarea id="localSdp" readonly placeholder="Generated SDP will appear here..."></textarea>
+    <textarea id="localSdp" readonly placeholder="Generated SDP will appear here..."></textarea>
         
-        <label>Paste Remote SDP here:</label>
-        <textarea id="remoteSdp" placeholder="Paste the SDP from the other peer here..."></textarea>
-        
-        <button id="answerButton" disabled>2. Create Answer (If pasting an Offer)</button>
-        <button id="connectButton" disabled>3. Accept Answer (If pasting an Answer)</button>
-    </div>
+    <textarea id="remoteSdp" placeholder="Paste the SDP from the other peer here..."></textarea>
+    <button id="answerButton" disabled>2. Create Answer (If pasting an Offer)</button>
+    <button id="connectButton" disabled>3. Accept Answer (If pasting an Answer)</button>
 
-    <div class="box">
-        <h3>Step 3: Chat (Direct P2P Data Channel)</h3>
-        <input type="text" id="messageInput" placeholder="Type 'Hello World'..." disabled style="width: 70%; padding: 8px;">
-        <button id="sendButton" disabled style="padding: 8px 15px;">Send</button>
-        <div id="chatHistory" style="margin-top: 15px; white-space: pre-wrap; background: #eee; padding: 10px;"></div>
-    </div>
+    <input type="text" id="messageInput" placeholder="Type 'Hello World'..." disabled style="width: 70%; padding: 8px;">
+    <button id="sendButton" disabled style="padding: 8px 15px;">Send</button>
+    <div id="chatHistory" style="margin-top: 15px; white-space: pre-wrap; background: #eee; padding: 10px;"></div>
 
     <script>
         let pc; // RTCPeerConnection object
