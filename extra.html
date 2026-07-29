@@ -30,7 +30,13 @@
         const chatHistory = document.getElementById('chatHistory');
 
         // Optional configuration setup for STUN servers
-        const configuration = { iceServers: [{ urls: 'stun:://google.com' }] };
+        const configuration = { 
+            iceServers: [
+                { 
+                    urls: ["stun:://google.com", "stun:://google.com"] 
+                }
+            ] 
+        };
 
         // --- STEP 1: INITIALIZE PEER ---
         startButton.onclick = async () => {
